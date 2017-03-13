@@ -1,2 +1,2 @@
-#include "obs.h"
-
+#include <obs-module.h>
+#include <lua.h>
