@@ -149,7 +149,7 @@ bool lua_filter_reload(obs_properties_t *props, obs_property_t *property, void *
 			lua_ld_cb(filter->L, filter->source_info.destroy_ref);
 			pushdata(filter);
 			int res;
-			lua_pcall(filter->L, 1, 0, 0, res);
+			lua_dpcall(filter->L, 1, 0, 0, res);
 		}
 		lua_close(filter->L);
 		filter->L = NULL;
