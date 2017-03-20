@@ -8,8 +8,30 @@ void lua_print_error(lua_State* L)
 {
 	const char* message = lua_tostring(L, -1);
 
-	blog(LOG_DEBUG, "[LUA::ERROR] %s", message);
+	blog(LOG_ERROR, "[LUA::ERROR] %s", message);
 	lua_pop(L, 2);
+}
+
+void lua_debug_return(lua_State* L)
+{
+	int rets = lua_gettop(L);
+	for (int i = 1; i <= rets; i++)
+	{
+		const char* v = luaL_tolstring(L, i, NULL);
+		blog(LOG_DEBUG, "[LUA::DEBUG] Return value #%i: %s", i, v);
+		lua_pop(L, 1);
+		if (lua_type(L, i) == LUA_TTABLE)
+		{
+			lua_print_table(L, i);
+		}
+	}
+}
+
+void lua_debug_value(lua_State* L, int idx)
+{
+	const char* v = luaL_tolstring(L, idx, NULL);
+	blog(LOG_DEBUG, "[LUA::DEBUG] %s", v);
+	lua_pop(L, 1);
 }
 
 void lua_print_table(lua_State* L, int idx)

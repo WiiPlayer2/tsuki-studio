@@ -1,6 +1,8 @@
 #pragma once
 #include "lua.hpp"
 
+void lua_debug_value(lua_State* L, int idx);
+void lua_debug_return(lua_State* L);
 void lua_open_helper(lua_State* L);
 void lua_print_error(lua_State* L);
 void lua_print_table(lua_State* L, int idx);

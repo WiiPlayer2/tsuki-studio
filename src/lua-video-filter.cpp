@@ -12,6 +12,7 @@
 #define has_cb(data, cb) (data->L && data->source_info.cb != -1)
 #define lua_cb(data, cb) check_lua(data) if(has_cb(data, cb))
 #define lua_dpcall(L, n, r, f, res) res = lua_pcall(L, n, r, f); if(res != LUA_OK) { lua_print_error(L); }
+#define pushdata(f) if(f->data_ref == -1) { lua_pushnil(f->L); } else { lua_rawgeti(f->L, LUA_REGISTRYINDEX, f->data_ref); }
 
 struct filter_data
 {
@@ -20,6 +21,7 @@ struct filter_data
 
 	const char* lua_file_path;
 	lua_State* L;
+	int data_ref = -1;
 
 	lua_obs_source_info source_info;
 };
@@ -39,6 +41,15 @@ void lua_load(filter_data* filter)
 			{
 				filter->source_info = lua_to_obs_source_info(filter->L, 1);
 				failed = false;
+
+				//filter_create
+				lua_ld_cb(filter->L, filter->source_info.create_ref);
+				lua_push_cpointer(filter->L, filter->settings);
+				lua_push_cpointer(filter->L, filter->context);
+				int res;
+				lua_dpcall(filter->L, 2, 2, 0, res);
+				lua_pushvalue(filter->L, 2);
+				filter->data_ref = luaL_ref(filter->L, LUA_REGISTRYINDEX);
 			}
 			else
 			{
@@ -69,6 +80,7 @@ void lua_load(filter_data* filter)
 	if (failed)
 	{
 		filter->source_info = { 0 };
+		filter->data_ref = -1;
 		lua_close(filter->L);
 		filter->L = NULL;
 	}
@@ -88,9 +100,10 @@ void filter_update(void* data, obs_data_t* settings)
 	lua_cb(filter, update_ref)
 	{
 		lua_ld_cb(filter->L, filter->source_info.update_ref);
+		pushdata(filter);
 		lua_push_cpointer(filter->L, settings);
 		int res;
-		lua_dpcall(filter->L, 1, 0, 0, res);
+		lua_dpcall(filter->L, 2, 0, 0, res);
 	}
 }
 
@@ -99,16 +112,9 @@ void* filter_create(obs_data_t *settings, obs_source_t *context)
 	filter_data* filter = (filter_data*)bzalloc(sizeof(filter_data));
 	filter->context = context;
 	filter->settings = settings;
-	filter_update(filter, settings);
+	filter->lua_file_path = obs_data_get_string(settings, SETTING_LUA_FILE_PATH);
 
-	lua_cb(filter, create_ref)
-	{
-		lua_ld_cb(filter->L, filter->source_info.create_ref);
-		lua_push_cpointer(filter->L, filter->settings);
-		lua_push_cpointer(filter->L, filter->context);
-		int res;
-		lua_dpcall(filter->L, 2, 0, 0, res);
-	}
+	lua_cb(filter, create_ref) { }
 
 	return filter;
 }
@@ -120,8 +126,9 @@ void filter_destroy(void *data)
 	lua_cb(filter, destroy_ref)
 	{
 		lua_ld_cb(filter->L, filter->source_info.destroy_ref);
+		pushdata(filter);
 		int res;
-		lua_dpcall(filter->L, 0, 0, 0, res);
+		lua_dpcall(filter->L, 1, 0, 0, res);
 	}
 
 	if (filter->L)
@@ -135,27 +142,20 @@ bool lua_filter_reload(obs_properties_t *props, obs_property_t *property, void *
 {
 	filter_data* filter = (filter_data*)data;
 
-	filter->source_info = { 0 };
 	if (filter->L)
 	{
 		lua_cb(filter, destroy_ref)
 		{
 			lua_ld_cb(filter->L, filter->source_info.destroy_ref);
+			pushdata(filter);
 			int res;
-			lua_pcall(filter->L, 0, 0, 0, res);
+			lua_pcall(filter->L, 1, 0, 0, res);
 		}
 		lua_close(filter->L);
 		filter->L = NULL;
 	}
-
-	lua_cb(filter, create_ref)
-	{
-		lua_ld_cb(filter->L, filter->source_info.create_ref);
-		lua_push_cpointer(filter->L, filter->settings);
-		lua_push_cpointer(filter->L, filter->context);
-		int res;
-		lua_dpcall(filter->L, 2, 0, 0, res);
-	}
+	filter->source_info = { 0 };
+	filter->data_ref = -1;
 
 	return true;
 }
@@ -171,9 +171,10 @@ obs_properties_t* filter_get_properties(void *data)
 	lua_cb(filter, get_properties_ref)
 	{
 		lua_ld_cb(filter->L, filter->source_info.get_properties_ref);
+		pushdata(filter);
 		lua_push_cpointer(filter->L, props);
 		int res;
-		lua_dpcall(filter->L, 1, 0, 0, res);
+		lua_dpcall(filter->L, 2, 0, 0, res);
 	}
 
 	return props;
@@ -186,9 +187,10 @@ void filter_video_render(void* data, gs_effect_t* effect)
 	lua_cb(filter, video_render_ref)
 	{
 		lua_ld_cb(filter->L, filter->source_info.video_render_ref);
+		pushdata(filter);
 		lua_push_cpointer(filter->L, effect);
 		int res;
-		lua_dpcall(filter->L, 1, 0, 0, res);
+		lua_dpcall(filter->L, 2, 0, 0, res);
 	}
 }
 
@@ -199,8 +201,9 @@ uint32_t filter_get_width(void* data)
 	lua_cb(filter, get_width_ref)
 	{
 		lua_ld_cb(filter->L, filter->source_info.get_width_ref);
+		pushdata(filter);
 		int res;
-		lua_dpcall(filter->L, 0, 1, 0, res);
+		lua_dpcall(filter->L, 1, 1, 0, res);
 		return lua_tointeger(filter->L, -1);
 	}
 	else
@@ -216,8 +219,9 @@ uint32_t filter_get_height(void* data)
 	lua_cb(filter, get_height_ref)
 	{
 		lua_ld_cb(filter->L, filter->source_info.get_height_ref);
+		pushdata(filter);
 		int res;
-		lua_dpcall(filter->L, 0, 1, 0, res);
+		lua_dpcall(filter->L, 1, 1, 0, res);
 		return lua_tointeger(filter->L, -1);
 	}
 	else
@@ -233,9 +237,10 @@ void filter_video_tick(void* data, float seconds)
 	lua_cb(filter, video_tick_ref)
 	{
 		lua_ld_cb(filter->L, filter->source_info.video_tick_ref);
+		pushdata(filter);
 		lua_pushnumber(filter->L, seconds);
 		int res;
-		lua_dpcall(filter->L, 1, 0, 0, res);
+		lua_dpcall(filter->L, 2, 0, 0, res);
 	}
 }
 
