@@ -89,7 +89,6 @@ technique Draw
 
 function load_effect()
 	local file = os.getenv("TMP") .. os.tmpname()
-	obs.log(obs.LOG_DEBUG, file)
 	local fh = io.open(file, "w")
 	fh:write(effect_content)
 	fh:flush()
