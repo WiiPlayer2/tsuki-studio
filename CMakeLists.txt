@@ -13,6 +13,9 @@ option (BUILD_X64
 if (BUILD_X64)
 	set (BUILD_PLATFORM x64)
 	set (OBS_BUILD_DIR build64)
+else ()
+	set (BUILD_PLATFORM x86)
+	set (OBS_BUILD_DIR build)
 endif ()
 
 if (NOT BUILD_PLATFORM)
